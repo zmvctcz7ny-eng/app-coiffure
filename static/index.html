@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DocEdit</title>
+  <meta name="description" content="Importer, scanner, modifier et télécharger vos documents.">
+  <meta name="theme-color" content="#1d4ed8">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="DocEdit">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="/static/style.css?v=1">
+</head>
+<body>
+
+<!-- ============================== ACCUEIL ============================== -->
+<section id="home" class="view active">
+  <header class="home-head">
+    <img src="/static/icons/icon-192.png" alt="" class="logo">
+    <div>
+      <h1>DocEdit</h1>
+      <p class="tagline">Modifiez les textes, chiffres et dates de vos documents.</p>
+    </div>
+  </header>
+
+  <div class="home-actions">
+    <button class="big-btn primary" id="btnImport">
+      <span class="ico" aria-hidden="true">📄</span>
+      <span class="lbl">Importer un fichier</span>
+      <span class="sub">PDF, Word, Excel, photo (JPG, PNG, HEIC)</span>
+    </button>
+    <button class="big-btn secondary" id="btnScan">
+      <span class="ico" aria-hidden="true">📷</span>
+      <span class="lbl">Scanner un document</span>
+      <span class="sub">Avec la caméra, une ou plusieurs pages</span>
+    </button>
+  </div>
+
+  <div id="dropzone" class="dropzone">
+    <p><strong>Ou glissez-déposez un fichier ici</strong></p>
+  </div>
+
+  <button id="btnResume" class="link-btn hidden"></button>
+
+  <div class="home-foot">
+    <button class="pill" id="btnInstall">📲 Ajouter à l'écran d'accueil</button>
+    <button class="pill" id="btnPhone">📱 Ouvrir sur mon téléphone</button>
+  </div>
+  <p id="ocrWarning" class="notice hidden"></p>
+  <input type="file" id="fileInput" hidden
+         accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.heic,.heif,.webp,.tif,.tiff,image/*,application/pdf">
+</section>
+
+<!-- ============================== SCANNER ============================== -->
+<section id="scanner" class="view dark">
+  <div class="scan-top">
+    <button class="icon-btn light" id="scanClose" aria-label="Fermer">✕</button>
+    <span id="scanHint" class="scan-hint">Cadrez la feuille entière</span>
+    <span></span>
+  </div>
+  <div class="cam-wrap" id="camWrap">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="camOverlay"></canvas>
+    <div id="camFallback" class="cam-fallback hidden">
+      <p>Prenez la feuille en photo : les bords seront détectés automatiquement.</p>
+      <button class="big-btn primary" id="btnTakePhoto"><span class="ico">📷</span><span class="lbl">Prendre une photo</span></button>
+      <button class="pill light" id="btnPickPhoto">Choisir une photo existante</button>
+    </div>
+  </div>
+  <div class="scan-bottom">
+    <div id="thumbs" class="thumbs"></div>
+    <div class="scan-controls">
+      <span class="spacer"></span>
+      <button id="shutter" class="shutter" aria-label="Prendre la photo"></button>
+      <button id="scanDone" class="done-btn" disabled>Terminer</button>
+    </div>
+  </div>
+  <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+  <input type="file" id="photoPick" accept="image/*" hidden>
+</section>
+
+<!-- ============================== RECADRAGE ============================== -->
+<section id="adjust" class="view dark">
+  <div class="scan-top">
+    <button class="icon-btn light" id="adjBack" aria-label="Reprendre">←</button>
+    <span class="scan-hint">Ajustez les 4 coins si besoin</span>
+    <span></span>
+  </div>
+  <div class="adj-wrap" id="adjWrap">
+    <div class="adj-stage" id="adjStage">
+      <img id="adjImg" alt="Photo à recadrer">
+      <svg id="adjSvg"><polygon id="adjPoly"></polygon></svg>
+    </div>
+  </div>
+  <div class="adj-bottom">
+    <div class="seg" id="modeSeg" role="radiogroup" aria-label="Amélioration">
+      <button data-mode="auto" class="on">Couleur</button>
+      <button data-mode="gray">Gris</button>
+      <button data-mode="bw">Noir &amp; blanc</button>
+      <button data-mode="original">Original</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost light" id="adjRetake">Reprendre</button>
+      <button class="btn primary" id="adjOk">✓ Valider la page</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== ÉDITEUR ============================== -->
+<section id="editor" class="view">
+  <header class="toolbar">
+    <button class="icon-btn" id="edHome" aria-label="Accueil" title="Accueil">⌂</button>
+    <div class="doc-title">
+      <strong id="docName"></strong>
+      <small id="docInfo"></small>
+    </div>
+    <div class="tools">
+      <button class="icon-btn" id="btnUndo" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled>↶<span>Annuler</span></button>
+      <button class="icon-btn" id="btnRedo" title="Rétablir (Ctrl+Y)" aria-label="Rétablir" disabled>↷<span>Rétablir</span></button>
+      <button class="icon-btn" id="btnSearch" title="Rechercher / Remplacer" aria-label="Rechercher / Remplacer">🔍<span>Remplacer</span></button>
+      <button class="icon-btn hide-mobile" id="btnZoomOut" title="Zoom arrière" aria-label="Zoom arrière">−</button>
+      <button class="icon-btn hide-mobile" id="btnZoomIn" title="Zoom avant" aria-label="Zoom avant">+</button>
+      <button class="btn primary dl" id="btnExport">⬇ <span>Télécharger</span></button>
+    </div>
+  </header>
+  <div class="ed-sub">
+    <label class="switch"><input type="checkbox" id="chkBoxes" checked> <span>Montrer les zones modifiables</span></label>
+    <span id="editCount" class="muted"></span>
+  </div>
+  <div id="banners"></div>
+  <main id="pages" class="pages"></main>
+</section>
+
+<!-- ============================== FENÊTRES ============================== -->
+<div id="sheetBack" class="sheet-back hidden"></div>
+
+<div id="editSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+  <h2 id="editTitle">Modifier le texte</h2>
+  <p class="orig">Texte lu : <span id="editOrig"></span></p>
+  <textarea id="editText" rows="2" spellcheck="true"></textarea>
+  <label class="switch hidden" id="boldRow"><input type="checkbox" id="editBold"> <span><b>Gras</b></span></label>
+  <div class="row wrap">
+    <button class="btn ghost" id="editRestore">↺ Texte d'origine</button>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="editCancel">Annuler</button>
+    <button class="btn primary" id="editSave">✓ Valider</button>
+  </div>
+</div>
+
+<div id="searchSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+  <h2 id="searchTitle">Rechercher / Remplacer</h2>
+  <label class="field">Rechercher<input id="sQ" type="text" autocomplete="off" placeholder="ex. 2024"></label>
+  <label class="field">Remplacer par<input id="sR" type="text" autocomplete="off" placeholder="ex. 2025"></label>
+  <div class="row wrap">
+    <label class="switch"><input type="checkbox" id="sCase"> <span>Respecter majuscules/minuscules</span></label>
+    <label class="switch"><input type="checkbox" id="sWord"> <span>Mot entier</span></label>
+  </div>
+  <p id="sResult" class="muted"></p>
+  <div class="row wrap">
+    <button class="btn ghost" id="sClose">Fermer</button>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="sFind">Rechercher</button>
+    <button class="btn primary" id="sReplace">Tout remplacer</button>
+  </div>
+</div>
+
+<div id="exportSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+  <h2 id="exportTitle">Télécharger le document modifié</h2>
+  <p class="muted">Votre fichier d'origine n'est jamais modifié : vous téléchargez une copie.</p>
+  <div id="exportList" class="choices"></div>
+  <div class="row">
+    <button class="btn ghost" id="exportCancel">Annuler</button>
+    <span class="spacer"></span>
+    <button class="btn primary" id="exportGo">⬇ Télécharger</button>
+  </div>
+</div>
+
+<div id="installSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+  <h2 id="installTitle">Ajouter DocEdit à l'écran d'accueil</h2>
+  <div id="installText"></div>
+  <div class="row"><span class="spacer"></span><button class="btn primary" data-close>Compris</button></div>
+</div>
+
+<div id="phoneSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="phoneTitle">
+  <h2 id="phoneTitle">Ouvrir DocEdit sur votre téléphone</h2>
+  <p>Votre téléphone doit être connecté <strong>au même Wi-Fi</strong> que cet ordinateur. Scannez ce code avec l'appareil photo du téléphone :</p>
+  <div class="qr"><img id="qrImg" alt="QR code"></div>
+  <p class="center"><code id="qrUrl"></code></p>
+  <p class="muted small" id="httpsTip"></p>
+  <div class="row"><span class="spacer"></span><button class="btn primary" data-close>Fermer</button></div>
+</div>
+
+<div id="loading" class="loading hidden" role="status" aria-live="polite">
+  <div class="spinner"></div>
+  <p id="loadingMsg">Chargement…</p>
+</div>
+<div id="toast" class="toast hidden" role="alert"></div>
+
+<script src="/static/app.js?v=1"></script>
+</body>
+</html>
